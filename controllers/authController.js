@@ -1,12 +1,15 @@
-const CreateError = require('http-errors')
+const createError = require('http-errors')
 const User = require('../models/User')
+const generateTokenRandom = require('../helpers/generateTokenRandom')
+const generateJWT = require('../helpers/generateJWT')
 
 
 const register = async (req,res) =>{
     
     try {
-        const { name, password, email} = req.body
-        if([name,password,email].includes('') || !name || !password || !email){
+        const { name, email, password
+        } = req.body
+        if([name,email,password].includes('') || !name || !email || !password){
             throw CreateError(400,'Todos los campos son obligatorios')
         }
         let user = await User.findOne({
@@ -18,7 +21,7 @@ const register = async (req,res) =>{
         }
 
         user = new User(req.body);
-        user.token = 'BDbybyfaf8';
+        user.token = generateTokenRandom();
         const useStore = await user.save();
         console.log(useStore);
 
@@ -37,22 +40,41 @@ const register = async (req,res) =>{
 
 const login = async (req,res) =>{
     try {
-        const { name, password, email} = req.body
-        if([name,password,email].includes('') || !email || !password){
-            throw CreateError(400,'Todos los campos son obligatorios')
-        }        
+        //console.log(req.body);
+        const {email, password} = req.body;
 
+        if([email, password].includes("") || !email || !password){
+            throw createError(400, "Todos los campos son obligatorios")
+        }
+    
         let user = await User.findOne({
             email
         })
-
+    
         if(!user){
-            throw CreateError(400,'Usuario inexistente')
+            throw createError(400, "Usuario inexistente")
+        }
+    
+        if(await user.checkedPassword(password)){
+            return res.status(200).json({
+                ok:true,
+                token: generateJWT({
+                    user : {
+                        id: user._id,
+                        name: user.name,
+                    }
+                })
+            })
+        } else{
+            throw createError(403, "Credenciales inválidas")
         }
 
 
     } catch (error) {
-        
+        return res.status(error.status || 500).json({
+            ok : false,
+            message : error.message || 'Houston we have a problem'
+        })
     }
 }
 
